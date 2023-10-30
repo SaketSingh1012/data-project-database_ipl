@@ -93,7 +93,7 @@ ORDER BY count DESC;
 SELECT season, player_of_match
 FROM (
     SELECT season, player_of_match, COUNT(*) AS match_count,
-           ROW_NUMBER() OVER (PARTITION BY season ORDER BY COUNT(*) DESC) AS rn
+           DENSE_RANK() OVER (PARTITION BY season ORDER BY COUNT(*) DESC ) AS rn
     FROM matches
     GROUP BY season, player_of_match
 ) subquery
@@ -116,7 +116,7 @@ DhoniBallsFaced AS (
     GROUP BY dd.match_id
 )
 SELECT m.season,
-       ROUND((SUM(DR.total_runs) / SUM(DBF.total_balls_faced) * 100)::numeric, 2) AS strike_rate
+       ROUND((SUM(DR.total_runs) / SUM(DBF.total_balls_faced) * 100)::numeric, 2) AS MS_Dhoni_strike_rate
 FROM matches m
 JOIN DhoniRuns DR ON m.id = DR.match_id
 JOIN DhoniBallsFaced DBF ON m.id = DBF.match_id
@@ -162,27 +162,9 @@ ORDER BY
 LIMIT 1;
 
 -- 9.Best economy in super over
-WITH SuperOverDeliveries AS (
-    SELECT
-        bowler,
-        SUM(total_runs - legbye_runs - bye_runs - penalty_runs)
-        AS total_runs_conceded,
-        COUNT(*) AS total_fair_deliveries
-    FROM
-        deliveries
-    WHERE
-        is_super_over = 1
-        AND (noball_runs = 0 OR wide_runs = 0)
-    GROUP BY
-        bowler
-)
-SELECT
-    bowler,
-    ROUND(SUM(total_runs_conceded) * 6.0 / SUM(total_fair_deliveries), 2) AS economy
-FROM
-    SuperOverDeliveries
-GROUP BY
-    bowler
-ORDER BY
-    economy
-LIMIT 1;
+With t1 as (Select bowler,sum(total_runs-legbye_runs-bye_runs-penalty_runs) as total_runs_conceded,sum(
+case 
+	when wide_runs=0 and noball_runs=0 Then 1
+end
+) as total_fair_deliveries from deliveries where is_super_over=1 group by bowler)
+Select bowler,round((total_runs_conceded*6.0)/total_fair_deliveries,2) as eco from t1 order by eco limit 1;
